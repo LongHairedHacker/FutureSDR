@@ -48,17 +48,23 @@ impl FileSource {
 impl AsyncKernel for FileSource {
     async fn work(
         &mut self,
-        _io: &mut WorkIo,
+        io: &mut WorkIo,
         sio: &mut StreamIo,
         _mio: &mut MessageIo<Self>,
         _meta: &mut BlockMeta,
     ) -> Result<()> {
         let out = sio.output(0).slice::<f32>();
 
+        let mut count = 0;
         for (i, v) in self.src.by_ref().take(out.len()).enumerate() {
             out[i] = v;
+            count += 1;
         }
-        sio.output(0).produce(out.len());
+        sio.output(0).produce(count);
+
+        if count == 0 {
+            io.finished = true;
+        }
 
         Ok(())
     }

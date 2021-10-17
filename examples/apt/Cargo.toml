@@ -1,0 +1,15 @@
+[package]
+name = "apt"
+version = "0.0.1"
+edition = "2018"
+
+[[bin]]
+name = "apt-decode"
+path = "apt-decode.rs"
+
+
+[dependencies]
+futuresdr = { path = "../..", features = ["audio"] }
+async-trait = "0.1.41"
+num-complex = "0.4.0"
+image = "0.23.14"
