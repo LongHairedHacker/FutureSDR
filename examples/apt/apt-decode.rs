@@ -278,7 +278,7 @@ impl AsyncKernel for Upsampler {
             }
         }
 
-        println!("finished={} n={} i.len={}", sio.input(0).finished(), n, i.len());
+        //println!("finished={} n={} i.len={}", sio.input(0).finished(), n, i.len());
         if sio.input(0).finished() && i.len() == n {
             io.finished = true;
         }
@@ -375,7 +375,7 @@ const SYNCB_SEQ: [bool; 40] = [
 ];
 
 const PIXELS_PER_LINE: usize = 2080;
-const LINES: usize = 500;
+const HEIGT_INCREMENT: usize = 100;
 
 pub struct APTImageSink {
     avg_level: f32,
@@ -409,7 +409,7 @@ impl APTImageSink {
                 has_sync: false,
                 max_level: 0.0,
                 previous_pixel: 0.0,
-                img: image::DynamicImage::new_luma8(PIXELS_PER_LINE as u32, LINES as u32)
+                img: image::DynamicImage::new_luma8(PIXELS_PER_LINE as u32, HEIGT_INCREMENT as u32)
                     .into_luma8(),
                 path,
             },
@@ -486,17 +486,25 @@ impl AsyncKernel for APTImageSink {
             self.max_level = f32::max(pixel, self.max_level);
             let color = (pixel / self.max_level * 255.0) as u8;
             //println!("Color {} {}: {}", self.x, self.y, color);
-            if self.y < LINES {
-                self.img
-                    .put_pixel(self.x as u32, self.y as u32, image::Luma([color]));
-            }
+
+            self.img
+                .put_pixel(self.x as u32, self.y as u32, image::Luma([color]));
+
             self.x += 1;
             if self.x >= PIXELS_PER_LINE {
                 self.x = 0;
                 self.y += 1;
 
-                if self.y % 100 == 0 {
+                if self.y >= self.img.height() as usize {
                     self.img.save(&self.path);
+
+                    let mut new_img = image::DynamicImage::new_luma8(
+                        PIXELS_PER_LINE as u32,
+                        self.img.height() + HEIGT_INCREMENT as u32,
+                    )
+                    .into_luma8();
+                    image::imageops::replace(&mut new_img, &self.img, 0, 0);
+                    self.img = new_img;
                 }
             }
             self.previous_pixel = pixel;
@@ -504,7 +512,12 @@ impl AsyncKernel for APTImageSink {
 
         if sio.input(0).finished() {
             io.finished = true;
-            self.img.save(&self.path);
+
+            let mut new_img =
+                image::DynamicImage::new_luma8(PIXELS_PER_LINE as u32, (self.y + 1) as u32)
+                    .into_luma8();
+            image::imageops::replace(&mut new_img, &self.img, 0, 0);
+            new_img.save(&self.path);
         }
 
         if n == 0 {
